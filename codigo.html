@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConsoleScript v5 Web</title>
+<style>
+    body {
+        font-family: monospace;
+        background-color: #1E1E1E;
+        color: #FFFFFF;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+    h1 {
+        color: #00B0F0;
+        margin-bottom: 15px;
+    }
+    textarea {
+        width: 90%;
+        height: 250px;
+        background-color: #2F3136;
+        color: white;
+        border: none;
+        padding: 10px;
+        font-size: 16px;
+        resize: none;
+    }
+    button {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background-color: #5865F2;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    #terminal {
+        width: 90%;
+        margin-top: 20px;
+        background-color: #0D47A1;
+        padding: 10px;
+        border-radius: 5px;
+        height: 250px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+    }
+    #inputTerminal {
+        margin-top: 10px;
+        width: 70%;
+        padding: 8px;
+        background-color: #2F3136;
+        border: none;
+        color: white;
+    }
+    #btnEnviar {
+        padding: 8px 15px;
+        background-color: #42A5F5;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        margin-left: 5px;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+
+<h1>💻 ConsoleScript v5 Web</h1>
+
+<textarea id="inputCode">console("Digite algo com várias palavras:")
+wait(0)
+console("A segunda palavra foi: " + terminal(2))
+console("Repetindo: " + mensagem(2))
+console("Fim do teste!")</textarea>
+
+<button id="btnRun">Executar</button>
+
+<div id="terminal"></div>
+<div id="inputArea" style="display:none;">
+    <input type="text" id="inputTerminal" placeholder="Digite aqui...">
+    <button id="btnEnviar">Enviar</button>
+</div>
+
+<script>
+let vars = {};
+let terminalInput = "";
+let codigoGlobal = "";
+
+const terminalDiv = document.getElementById("terminal");
+const inputArea = document.getElementById("inputArea");
+const inputTerminal = document.getElementById("inputTerminal");
+const btnRun = document.getElementById("btnRun");
+const btnEnviar = document.getElementById("btnEnviar");
+
+// Função de impressão no terminal
+function print(txt) {
+    terminalDiv.textContent += txt + "\n";
+    terminalDiv.scrollTop = terminalDiv.scrollHeight;
+}
+
+// Função random (mantida)
+function random(valor) {
+    if (typeof valor === "string" && valor.includes(";")) {
+        valor = valor.replace(/['"]/g, "");
+        const partes = valor.split(";");
+        if (!isNaN(partes[0]) && !isNaN(partes[1])) {
+            const min = parseFloat(partes[0]);
+            const max = parseFloat(partes[1]);
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        } else {
+            return partes[Math.floor(Math.random() * partes.length)];
+        }
+    }
+    return valor;
+}
+
+// 🆕 terminal(n): retorna o argumento n da entrada
+function terminal(n) {
+    if (!terminalInput) return "";
+    const palavras = terminalInput.trim().split(/\s+/);
+    const pos = n - 1;
+    return palavras[pos] || "";
+}
+
+// 🆕 mensagem(n): repete o argumento n digitado pelo usuário
+function mensagem(n) {
+    const arg = terminal(n);
+    return arg ? arg : "(sem palavra)";
+}
+
+// ---------------------- Sistema principal -----------------------
+
+btnRun.addEventListener("click", () => {
+    terminalDiv.textContent = "";
+    vars = {};
+    codigoGlobal = document.getElementById("inputCode").value.trim();
+    if (codigoGlobal.includes("wait(") || codigoGlobal.includes("if(")) {
+        inputArea.style.display = "block";
+    } else {
+        inputArea.style.display = "none";
+    }
+    ExecutarCodigo(codigoGlobal, 0);
+});
+
+btnEnviar.addEventListener("click", () => {
+    terminalInput = inputTerminal.value.trim();
+    print("Você: " + terminalInput);
+    inputTerminal.value = "";
+    ExecutarCodigo(codigoGlobal, 0);
+});
+
+function ExecutarCodigo(codigo, index) {
+    const linhas = codigo.split("\n");
+    if (index >= linhas.length) return;
+
+    const linha = linhas[index].trim();
+    if (!linha) return ExecutarCodigo(codigo, index + 1);
+
+    // #var
+    if (linha.startsWith("#var")) {
+        try {
+            const partes = linha.replace("#var", "").split("=");
+            const nome = partes[0].trim();
+            const valor = partes[1].trim();
+            if (!isNaN(valor)) vars[nome] = Number(valor);
+            else vars[nome] = valor.replace(/['"]/g, "");
+            print(`🔧 Variável '${nome}' = ${vars[nome]}`);
+        } catch { print("❌ Erro ao definir variável."); }
+        return ExecutarCodigo(codigo, index + 1);
+    }
+
+    // console()
+    if (linha.startsWith("console(")) {
+        try {
+            let conteudo = linha.match(/console\s*\((.*)\)/)[1];
+            for (let v in vars)
+                conteudo = conteudo.replace(new RegExp("\\b" + v + "\\b", "g"), vars[v]);
+            conteudo = conteudo
+                .replace(/random\(([^)]+)\)/g, (_, arg) => '"' + random(arg) + '"')
+                .replace(/terminal\(([^)]+)\)/g, (_, arg) => '"' + terminal(Number(arg)) + '"')
+                .replace(/mensagem\(([^)]+)\)/g, (_, arg) => '"' + mensagem(Number(arg)) + '"');
+            const result = eval(conteudo);
+            print(result);
+        } catch (e) {
+            print("❌ Erro na linha " + (index+1) + ": " + e.message);
+        }
+        return setTimeout(() => ExecutarCodigo(codigo, index + 1), 50);
+    }
+
+    // clear()
+    if (linha.startsWith("clear(") || linha === "clear()") {
+        try {
+            const match = linha.match(/clear\((\d+)\)/);
+            if (match) {
+                const qtd = parseInt(match[1]);
+                let linhasTerm = terminalDiv.textContent.trim().split("\n");
+                linhasTerm = linhasTerm.slice(0, -qtd);
+                terminalDiv.textContent = linhasTerm.join("\n") || "🧹 Terminal limpo.";
+            } else {
+                terminalDiv.textContent = "🧹 Terminal limpo.";
+            }
+        } catch {
+            print("❌ Erro ao executar clear().");
+        }
+        return ExecutarCodigo(codigo, index + 1);
+    }
+
+    // wait()
+    if (linha.startsWith("wait(")) {
+        const tempo = parseFloat(linha.match(/wait\((.*)\)/)[1]);
+        return setTimeout(() => ExecutarCodigo(codigo, index + 1), tempo * 1000);
+    }
+
+    // if()
+    if (linha.startsWith("if(")) {
+        let cond = linha.substring(3, linha.length - 1);
+        let ok = false;
+        try {
+            if (cond.includes("<")) ok = Number(terminalInput) < Number(cond.split("<")[1].trim());
+            else if (cond.includes(">")) ok = Number(terminalInput) > Number(cond.split(">")[1].trim());
+            else if (cond.includes("==")) {
+                const partes = cond.split("==");
+                const dir = partes[1].trim().replace(/['"]/g, "");
+                ok = (terminalInput == dir);
+            }
+        } catch { ok = false; }
+
+        let ifIndex = index + 1;
+        while (ifIndex < linhas.length && !linhas[ifIndex].trim().startsWith("endif")) {
+            if (ok) ExecutarCodigo(linhas[ifIndex], 0);
+            ifIndex++;
+        }
+        return ExecutarCodigo(codigo, ifIndex + 1);
+    }
+
+    // atribuição simples
+    if (linha.includes("=") && !linha.startsWith("if(") && !linha.startsWith("wait(") && !linha.startsWith("console(")) {
+        const partes = linha.split("=");
+        const nome = partes[0].trim();
+        const valor = partes[1].trim().replace(/['"]/g, "");
+        vars[nome] = isNaN(valor) ? valor : Number(valor);
+        return ExecutarCodigo(codigo, index + 1);
+    }
+
+    ExecutarCodigo(codigo, index + 1);
+}
+</script>
+
+</body>
+</html>
